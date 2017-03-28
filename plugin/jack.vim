@@ -2,31 +2,41 @@ function! s:beanstalk_url(opts, ...) abort
   if a:0 || type(a:opts) != type({})
     return ''
   endif
-  let organization = matchstr(get(a:opts, 'remote'), '^\(git@\)\zs\(\w\+\)\ze\(\.git\.beanstalkapp\.com:\)' ) "/\([^/:]\+\)/\([^/]\+\)\%(\.git\)\=$')
+
+  " Get the organization under which the repo is located
+  let organization = matchstr(get(a:opts, 'remote'), '^\(git@\)\zs\(\w\+\)\ze\(\.git\.beanstalkapp\.com:\)' ) 
+  " Get the remote repository name
   let repo = matchstr(get(a:opts, 'remote'), '^\(git@'.organization.'\.git\.beanstalkapp\.com:/'.organization.'/\)\zs\([^/]\+\)\ze\.git$')
+
   if organization ==# '' || repo ==# ''
     return ''
   endif
+
+  " Web root of repository on Beanstalk
+  let root = 'https://' . organization . '.beanstalkapp.com/' . repo
+
+  " Path from the git root to the current file
   let path = substitute(a:opts.path, '^/', '', '')
-  let root = 'https://' . organization . '.beanstalkapp.com/' . repo . '/browse/git/' . path
 
   if path =~# '^\.git/refs/heads/'
     let branch = a:opts.repo.git_chomp('config','branch.'.path[16:-1].'.merge')[11:-1]
+    
     if branch ==# ''
-      return root . '?ref=c-' . path[16:-1]
+      return root . '/changesets/' . path[16:-1]
     else
-      return root . '?ref=c-' . branch
+      return root . '/' . branch
     endif
   elseif path =~# '^\.git/refs/tags/'
     return root . '?ref=t-' . path[15:-1]
   elseif path =~# '^\.git/refs/remotes/[^/]\+/.'
-    return root . '?ref=c-' . matchstr(path,'remotes/[^/]\+/\zs.*')
+    return root . '/changesets/' . matchstr(path,'remotes/[^/]\+/\zs.*')
   elseif path =~# '.git/\%(config$\|hooks\>\)'
     return root
   elseif path =~# '^\.git\>'
     return root
   endif
 
+  " Try and guess the appropriate type of link to build (c-commit/b-branch/t-tag...)
   if a:opts.commit =~# '^\d\=$'
     let commit = a:opts.repo.rev_parse('HEAD')
   else
@@ -35,14 +45,19 @@ function! s:beanstalk_url(opts, ...) abort
   if get(a:opts, 'type', '') ==# 'tree' || a:opts.path =~# '/$'
     let url = substitute(root . '?ref=c-' . commit, '/$', '', 'g')
   elseif get(a:opts, 'type', '') ==# 'blob' || a:opts.path =~# '[^/]$'
-    let url = root . '?ref=c-' . commit
+    let url = root . '/browse/git/' . path . '?ref=c-' . commit
+
+    " line1 and line2 represent selected lines, and ideally should be
+    " highlighted in the target window. This is not working yet; I have an
+    " open support ticket with Beanstalk to figure it out - not sure yet if
+    " it's possible.
     if get(a:opts, 'line2') && a:opts.line1 == a:opts.line2
-      let url .= '#L' . a:opts.line1  " not working yet
+      let url .= '#L' . a:opts.line1  
     elseif get(a:opts, 'line2')
-      let url .= '#L' . a:opts.line1 . '-L' . a:opts.line2 " not working yet, probably not possible
+      let url .= '#L' . a:opts.line1 . '-L' . a:opts.line2 
     endif
   else
-    let url = root . '?ref=c-' . commit
+    let url = root . '/changesets/' . commit
   endif
   return url
 endfunction
