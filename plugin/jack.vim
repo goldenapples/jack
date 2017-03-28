@@ -27,8 +27,6 @@ function! s:beanstalk_url(opts, ...) abort
     return root
   endif
 
-
-  return get(a:opts, 'type', '')
   if a:opts.commit =~# '^\d\=$'
     let commit = a:opts.repo.rev_parse('HEAD')
   else
@@ -37,7 +35,7 @@ function! s:beanstalk_url(opts, ...) abort
   if get(a:opts, 'type', '') ==# 'tree' || a:opts.path =~# '/$'
     let url = substitute(root . '?ref=c-' . commit, '/$', '', 'g')
   elseif get(a:opts, 'type', '') ==# 'blob' || a:opts.path =~# '[^/]$'
-    let url = root . path . '?ref=b-' . commit
+    let url = root . '?ref=c-' . commit
     if get(a:opts, 'line2') && a:opts.line1 == a:opts.line2
       let url .= '#L' . a:opts.line1  " not working yet
     elseif get(a:opts, 'line2')
