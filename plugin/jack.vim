@@ -52,9 +52,9 @@ function! s:beanstalk_url(opts, ...) abort
     " open support ticket with Beanstalk to figure it out - not sure yet if
     " it's possible.
     if get(a:opts, 'line2') && a:opts.line1 == a:opts.line2
-      let url .= '#L' . a:opts.line1  
+      let url .= PathGuid(path, a:opts.line1)
     elseif get(a:opts, 'line2')
-      let url .= '#L' . a:opts.line1 . '-L' . a:opts.line2 
+      let url .= PathGuid(path, a:opts.line1 + ':' + a:opts.line2) 
     endif
   else
     let url = root . '/changesets/' . commit
@@ -62,8 +62,28 @@ function! s:beanstalk_url(opts, ...) abort
   return url
 endfunction
 
+function! PathGuid(filepath, linenum)
+  if has('ruby')
+    if !exists('s:loaded_ruby_zlib')
+      ruby require 'zlib'
+      let s:loaded_ruby_zlib = 1
+    endif
+    ruby <<EOF
+      hash1 = Zlib.crc32( VIM::evaluate('a:filepath' ) )
+      hash2 = Zlib.crc32( VIM::evaluate('a:linenum' ).to_s )
+      hashsum = (hash1 + hash2).to_s
+      VIM::command('let decstr = "#L' + hashsum + '"')
+EOF
+    return decstr
+  else
+    throw 'Vim must be compiled with Ruby support to use crc32 functions'
+  endif
+endfunction
+
 function! s:function(name) abort
   return function(substitute(a:name,'^s:',matchstr(expand('<sfile>'), '<SNR>\d\+_'),''))
 endfunction
 
 let g:fugitive_browse_handlers = [s:function('s:beanstalk_url')]
+
+" vi:et sts=2 ts=2 sw=2
